@@ -77,16 +77,18 @@ export default function Home() {
 
     const targets = photos.filter((p) => p.status !== "done");
 
-    await Promise.all(
-      targets.map(async (photo) => {
-        try {
-          const compressed = await compressImage(photo.file);
-          setPhotos((prev) =>
-            prev.map((p) =>
-              p.id === photo.id ? { ...p, status: "recognizing" } : p
-            )
-          );
+    const processOne = async (photo: PhotoState) => {
+      try {
+        const compressed = await compressImage(photo.file);
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id === photo.id ? { ...p, status: "recognizing" } : p
+          )
+        );
 
+        const maxAttempts = 3;
+        let lastError = "";
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           const res = await fetch("/api/recognize", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -96,31 +98,58 @@ export default function Home() {
             }),
           });
 
-          if (!res.ok) {
-            const errBody = (await res.json().catch(() => ({}))) as {
-              error?: string;
-            };
-            throw new Error(errBody.error ?? `HTTP ${res.status}`);
+          if (res.ok) {
+            const data = (await res.json()) as RecognizeResponseBody;
+            setPhotos((prev) =>
+              prev.map((p) =>
+                p.id === photo.id
+                  ? { ...p, status: "done", items: data.items }
+                  : p
+              )
+            );
+            return;
           }
 
-          const data = (await res.json()) as RecognizeResponseBody;
-          setPhotos((prev) =>
-            prev.map((p) =>
-              p.id === photo.id
-                ? { ...p, status: "done", items: data.items }
-                : p
-            )
-          );
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Unknown error";
-          setPhotos((prev) =>
-            prev.map((p) =>
-              p.id === photo.id ? { ...p, status: "error", error: message } : p
-            )
-          );
+          const errBody = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          lastError = errBody.error ?? `HTTP ${res.status}`;
+
+          const retriable =
+            res.status === 429 ||
+            res.status === 502 ||
+            res.status === 503 ||
+            res.status === 504 ||
+            /5\d\d/.test(lastError);
+          if (!retriable || attempt === maxAttempts) break;
+
+          const backoffMs = 800 * 2 ** (attempt - 1) + Math.random() * 400;
+          await new Promise((r) => setTimeout(r, backoffMs));
         }
-      })
+        throw new Error(lastError || "Unknown error");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id === photo.id ? { ...p, status: "error", error: message } : p
+          )
+        );
+      }
+    };
+
+    const concurrency = 2;
+    const queue = [...targets];
+    const workers = Array.from(
+      { length: Math.min(concurrency, queue.length) },
+      async () => {
+        while (queue.length > 0) {
+          const next = queue.shift();
+          if (!next) break;
+          await processOne(next);
+        }
+      }
     );
+    await Promise.all(workers);
 
     setRunning(false);
   }, [photos, running]);
