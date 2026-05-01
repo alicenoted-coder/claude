@@ -86,7 +86,7 @@ export default function Home() {
           )
         );
 
-        const maxAttempts = 3;
+        const maxAttempts = 4;
         let lastError = "";
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           const res = await fetch("/api/recognize", {
@@ -115,15 +115,14 @@ export default function Home() {
           };
           lastError = errBody.error ?? `HTTP ${res.status}`;
 
-          const retriable =
-            res.status === 429 ||
-            res.status === 502 ||
-            res.status === 503 ||
-            res.status === 504 ||
-            /5\d\d/.test(lastError);
-          if (!retriable || attempt === maxAttempts) break;
+          const isRateLimit =
+            res.status === 429 || /\b429\b/.test(lastError);
+          const isServerErr =
+            res.status >= 500 || /\b5\d\d\b/.test(lastError);
+          if ((!isRateLimit && !isServerErr) || attempt === maxAttempts) break;
 
-          const backoffMs = 800 * 2 ** (attempt - 1) + Math.random() * 400;
+          const baseMs = isRateLimit ? 7000 : 1500;
+          const backoffMs = baseMs * 2 ** (attempt - 1) + Math.random() * 1000;
           await new Promise((r) => setTimeout(r, backoffMs));
         }
         throw new Error(lastError || "Unknown error");
@@ -137,7 +136,7 @@ export default function Home() {
       }
     };
 
-    const concurrency = 2;
+    const concurrency = 1;
     const queue = [...targets];
     const workers = Array.from(
       { length: Math.min(concurrency, queue.length) },
