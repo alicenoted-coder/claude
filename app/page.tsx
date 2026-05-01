@@ -8,14 +8,22 @@ import type {
   RecognizeResponseBody,
 } from "@/lib/types";
 
+interface GroupedItem {
+  id: string;
+  item: RecognizedItem;
+  photoIndex: number;
+}
+
 interface CategoryGroup {
   category: string;
-  items: Array<{ item: RecognizedItem; photoIndex: number }>;
+  items: GroupedItem[];
 }
 
 export default function Home() {
   const [photos, setPhotos] = useState<PhotoState[]>([]);
   const [running, setRunning] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [copiedAt, setCopiedAt] = useState<number>(0);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,6 +50,11 @@ export default function Home() {
       if (target) URL.revokeObjectURL(target.previewUrl);
       return prev.filter((p) => p.id !== id);
     });
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const key of prev) if (key.startsWith(`${id}:`)) next.delete(key);
+      return next;
+    });
   }, []);
 
   const clearAll = useCallback(() => {
@@ -49,6 +62,7 @@ export default function Home() {
       prev.forEach((p) => URL.revokeObjectURL(p.previewUrl));
       return [];
     });
+    setSelected(new Set());
   }, []);
 
   const recognizeAll = useCallback(async () => {
@@ -112,12 +126,16 @@ export default function Home() {
   }, [photos, running]);
 
   const grouped = useMemo<CategoryGroup[]>(() => {
-    const map = new Map<string, CategoryGroup["items"]>();
+    const map = new Map<string, GroupedItem[]>();
     photos.forEach((photo, photoIndex) => {
-      photo.items?.forEach((item) => {
-        const key = item.category || "其他";
-        if (!map.has(key)) map.set(key, []);
-        map.get(key)!.push({ item, photoIndex });
+      photo.items?.forEach((item, j) => {
+        const cat = item.category || "其他";
+        if (!map.has(cat)) map.set(cat, []);
+        map.get(cat)!.push({
+          id: `${photo.id}:${j}`,
+          item,
+          photoIndex,
+        });
       });
     });
     return Array.from(map.entries())
@@ -128,18 +146,83 @@ export default function Home() {
       .sort((a, b) => b.items.length - a.items.length);
   }, [photos]);
 
-  const totalItems = grouped.reduce((sum, g) => sum + g.items.length, 0);
+  const allIds = useMemo(
+    () => grouped.flatMap((g) => g.items.map((i) => i.id)),
+    [grouped]
+  );
+  const totalItems = allIds.length;
+  const selectedCount = allIds.reduce(
+    (n, id) => n + (selected.has(id) ? 1 : 0),
+    0
+  );
+  const allSelected = totalItems > 0 && selectedCount === totalItems;
+
+  const toggleOne = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) => {
+      if (prev.size > 0) return new Set();
+      return new Set(allIds);
+    });
+  }, [allIds]);
+
+  const toggleCategory = useCallback((group: CategoryGroup) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allOn = group.items.every((i) => next.has(i.id));
+      if (allOn) {
+        group.items.forEach((i) => next.delete(i.id));
+      } else {
+        group.items.forEach((i) => next.add(i.id));
+      }
+      return next;
+    });
+  }, []);
+
+  const copySelected = useCallback(async () => {
+    if (selectedCount === 0) return;
+    const lines: string[] = ["家用品盤點 — 待販售清單", ""];
+    for (const group of grouped) {
+      const picks = group.items.filter((i) => selected.has(i.id));
+      if (picks.length === 0) continue;
+      lines.push(`【${group.category}】`);
+      for (const { item, photoIndex } of picks) {
+        const brand = item.brand?.trim();
+        const namePart = brand ? `${item.name}（${brand}）` : item.name;
+        lines.push(`- ${namePart} — 照片 #${photoIndex + 1}`);
+      }
+      lines.push("");
+    }
+    lines.push(`共 ${selectedCount} 項`);
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAt(Date.now());
+    } catch {
+      // Fallback: open a textarea modal? For now, just alert.
+      window.prompt("無法自動複製，請手動複製以下內容：", text);
+    }
+  }, [grouped, selected, selectedCount]);
+
   const hasAnyDone = photos.some((p) => p.status === "done");
   const allDone = photos.length > 0 && photos.every((p) => p.status === "done");
+  const justCopied = copiedAt > 0 && Date.now() - copiedAt < 2000;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6 sm:py-10">
+    <main className="mx-auto max-w-3xl px-4 py-6 sm:py-10 pb-32">
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-          批次拍照 → AI 辨識物品清單
+          家用品盤點 → 二手販售清單
         </h1>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          一次選多張照片，按下「開始辨識」，AI 會列出每張照片裡的物品。
+          拍家裡的東西，AI 列出可販售物品。勾選後複製清單貼到上架平台。
         </p>
       </header>
 
@@ -231,46 +314,123 @@ export default function Home() {
 
       {hasAnyDone && (
         <section className="mt-8">
-          <h2 className="text-lg font-semibold mb-3">
-            合併清單{" "}
-            <span className="text-neutral-500 font-normal">
-              （共 {totalItems} 項）
-            </span>
-          </h2>
+          <div className="flex items-center justify-between mb-3 gap-3">
+            <h2 className="text-lg font-semibold">
+              盤點清單{" "}
+              <span className="text-neutral-500 font-normal">
+                （共 {totalItems} 項）
+              </span>
+            </h2>
+            {totalItems > 0 && (
+              <button
+                type="button"
+                onClick={toggleAll}
+                className="text-sm text-blue-600 underline"
+              >
+                {allSelected ? "全不選" : "全選"}
+              </button>
+            )}
+          </div>
           {totalItems === 0 ? (
-            <p className="text-sm text-neutral-500">沒有辨識到任何物品。</p>
+            <p className="text-sm text-neutral-500">沒有辨識到可販售的物品。</p>
           ) : (
             <div className="space-y-4">
-              {grouped.map((group) => (
-                <div
-                  key={group.category}
-                  className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-hidden"
-                >
-                  <div className="bg-neutral-50 dark:bg-neutral-900 px-4 py-2 text-sm font-medium flex items-center justify-between">
-                    <span>{group.category}</span>
-                    <span className="text-neutral-500">{group.items.length}</span>
-                  </div>
-                  <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    {group.items.map(({ item, photoIndex }, i) => (
-                      <li
-                        key={`${group.category}-${i}`}
-                        className="px-4 py-2 flex items-center justify-between gap-3 text-sm"
-                      >
-                        <span className="font-medium">{item.name}</span>
-                        <span className="flex items-center gap-2 text-xs text-neutral-500">
-                          <span>照片 #{photoIndex + 1}</span>
-                          <span className="tabular-nums">
-                            {(item.confidence * 100).toFixed(0)}%
+              {grouped.map((group) => {
+                const groupSelectedCount = group.items.filter((i) =>
+                  selected.has(i.id)
+                ).length;
+                return (
+                  <div
+                    key={group.category}
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleCategory(group)}
+                      className="w-full bg-neutral-50 dark:bg-neutral-900 px-4 py-2 text-sm font-medium flex items-center justify-between hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{group.category}</span>
+                        {groupSelectedCount > 0 && (
+                          <span className="text-xs text-blue-600 font-normal">
+                            （已選 {groupSelectedCount}）
                           </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                        )}
+                      </span>
+                      <span className="text-neutral-500 font-normal">
+                        {group.items.length}
+                      </span>
+                    </button>
+                    <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                      {group.items.map(({ id, item, photoIndex }) => {
+                        const isSelected = selected.has(id);
+                        const brand = item.brand?.trim();
+                        return (
+                          <li
+                            key={id}
+                            className={`px-3 py-2 flex items-center gap-3 text-sm cursor-pointer transition-colors ${
+                              isSelected
+                                ? "bg-blue-50 dark:bg-blue-950/40"
+                                : "hover:bg-neutral-50 dark:hover:bg-neutral-900/50"
+                            }`}
+                            onClick={() => toggleOne(id)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleOne(id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-4 h-4 accent-blue-600 flex-shrink-0"
+                              aria-label={`選 ${item.name}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">
+                                {item.name}
+                              </div>
+                              {brand && (
+                                <div className="text-xs text-neutral-500 truncate">
+                                  {brand}
+                                </div>
+                              )}
+                            </div>
+                            <span className="flex items-center gap-2 text-xs text-neutral-500 flex-shrink-0">
+                              <span>#{photoIndex + 1}</span>
+                              <span className="tabular-nums">
+                                {(item.confidence * 100).toFixed(0)}%
+                              </span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
+      )}
+
+      {hasAnyDone && totalItems > 0 && (
+        <div className="fixed bottom-0 inset-x-0 border-t border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/95 backdrop-blur px-4 py-3">
+          <div className="mx-auto max-w-3xl flex items-center gap-3">
+            <div className="text-sm text-neutral-600 dark:text-neutral-400 flex-1">
+              已勾選{" "}
+              <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                {selectedCount}
+              </span>{" "}
+              / {totalItems} 項
+            </div>
+            <button
+              type="button"
+              onClick={copySelected}
+              disabled={selectedCount === 0}
+              className="rounded-lg bg-emerald-600 text-white px-4 py-2.5 text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors"
+            >
+              {justCopied ? "✓ 已複製" : `📋 複製勾選 (${selectedCount})`}
+            </button>
+          </div>
+        </div>
       )}
     </main>
   );
