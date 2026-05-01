@@ -1,6 +1,7 @@
 export interface RecognizedItem {
   name: string;
   category: string;
+  brand: string;
   confidence: number;
 }
 
