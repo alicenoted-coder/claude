@@ -216,19 +216,14 @@ export default function Home() {
 
   const copySelected = useCallback(async () => {
     if (selectedCount === 0) return;
-    const lines: string[] = ["家用品盤點 — 待販售清單", ""];
+    const lines: string[] = [];
     for (const group of grouped) {
-      const picks = group.items.filter((i) => selected.has(i.id));
-      if (picks.length === 0) continue;
-      lines.push(`【${group.category}】`);
-      for (const { item, photoIndex } of picks) {
+      for (const { id, item } of group.items) {
+        if (!selected.has(id)) continue;
         const brand = item.brand?.trim();
-        const namePart = brand ? `${item.name}（${brand}）` : item.name;
-        lines.push(`- ${namePart} — 照片 #${photoIndex + 1}`);
+        lines.push(brand ? `${item.name}（${brand}）` : item.name);
       }
-      lines.push("");
     }
-    lines.push(`共 ${selectedCount} 項`);
     const text = lines.join("\n");
     try {
       await navigator.clipboard.writeText(text);
