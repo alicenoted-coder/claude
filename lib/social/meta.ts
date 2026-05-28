@@ -1,12 +1,3 @@
-/**
- * Meta Graph API：涵蓋 Facebook、Instagram、Threads
- *
- * 自己的帳號：用 access_token（長效 User Token 或 Page Token）
- * 第三方公開粉專：用 App Token（只能拿公開欄位，留言/私訊不可得）
- *
- * Threads 使用獨立 base URL：https://graph.threads.net/v1.0
- */
-
 import type {
   SocialProfile,
   SocialPost,
@@ -15,6 +6,8 @@ import type {
   FetchResult,
   Platform,
 } from "./types";
+import { getValidToken } from "./token-refresh";
+import type { TokenPlatform } from "./token-store";
 
 const META_BASE = "https://graph.facebook.com/v21.0";
 const THREADS_BASE = "https://graph.threads.net/v1.0";
@@ -23,17 +16,10 @@ function baseUrl(platform: Platform) {
   return platform === "threads" ? THREADS_BASE : META_BASE;
 }
 
-function getToken(platform: Platform, userToken?: string): string {
+async function resolveToken(platform: Platform, userToken?: string): Promise<string> {
   if (userToken) return userToken;
-  const envKey =
-    platform === "threads"
-      ? "THREADS_ACCESS_TOKEN"
-      : platform === "instagram"
-      ? "INSTAGRAM_ACCESS_TOKEN"
-      : "FACEBOOK_ACCESS_TOKEN";
-  const token = process.env[envKey];
-  if (!token) throw new Error(`Missing ${envKey}`);
-  return token;
+  // YouTube 不走這裡，platform 必定是 Meta 的三個平台之一
+  return getValidToken(platform as TokenPlatform);
 }
 
 async function metaFetch<T>(
@@ -43,7 +29,7 @@ async function metaFetch<T>(
   userToken?: string
 ): Promise<T> {
   const url = new URL(`${baseUrl(platform)}${path}`);
-  url.searchParams.set("access_token", getToken(platform, userToken));
+  url.searchParams.set("access_token", await resolveToken(platform, userToken));
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }

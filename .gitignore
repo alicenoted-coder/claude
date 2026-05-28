@@ -27,6 +27,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# social media token cache (contains sensitive tokens)
+token-cache.json
+
 # vercel
 .vercel
 
