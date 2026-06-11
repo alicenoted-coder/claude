@@ -33,3 +33,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts.bak
+
+# clip agent 輸出
+clips/
+clip-agent/.last_video_id
