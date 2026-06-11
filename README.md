@@ -73,7 +73,66 @@ app/
 lib/
 ├── compress.ts              # 客戶端 resize + JPEG 壓縮 + base64
 └── types.ts                 # 共用型別
+scraper/                     # 社群／電商資料擷取 CLI（與 web app 獨立）
+├── cli.ts                   # 指令進入點：login / shopee / threads / instagram / facebook
+├── browser.ts               # Playwright 真實瀏覽器 + 自動捲動
+├── shopee.ts                # 蝦皮：帶 cookie 打內部 v4 JSON API
+├── meta.ts                  # Threads / IG：攔截 GraphQL 回應 + 遞迴收割貼文
+├── facebook.ts              # FB 粉專：DOM 盡力抽取
+├── walk.ts                  # 遞迴掃 JSON、用「形狀」找目標物件
+├── csv.ts                   # 三種 record 攤平成同一張 CSV（含 BOM）
+└── types.ts                 # profile / product / post 共用型別
 ```
+
+---
+
+# 社群／電商資料擷取（scraper/）
+
+抓 **蝦皮、Threads、Instagram、Facebook** 的公開頁面資訊（賣場/粉專基本資訊、商品名稱/價格/銷量、貼文內容/互動數），匯出成 CSV 做研究比對。
+
+> ⚠️ **合規提醒**：自建爬蟲擷取他人頁面**違反各平台服務條款**，平台可能封鎖你的帳號/IP。請：① 僅抓公開、彙總、去識別化資料做研究；② 依台灣**個資法**，避免蒐集可識別個人的資料；③ 已內建禮貌限速，請勿大量高頻抓取。風險自負。
+
+## 安裝
+
+```bash
+npm install
+npx playwright install chromium    # 下載瀏覽器（約 150MB，需一次）
+```
+
+## 用法
+
+```bash
+# IG / FB 有登入牆，先手動登入存 session（會開出瀏覽器視窗，登入後回終端機按 Enter）
+npm run scrape -- login instagram
+npm run scrape -- login facebook
+
+# 蝦皮賣場：基本資訊 + 商品（名稱/價格/銷量/評分/庫存）
+npm run scrape -- shopee --shop <賣場username> --limit 100
+
+# Threads / Instagram：個人檔案 + 貼文（內容/讚/留言/瀏覽）
+npm run scrape -- threads --user <handle> --limit 30
+npm run scrape -- instagram --user <handle>
+
+# Facebook 粉專：粉專名稱 + 貼文（盡力）
+npm run scrape -- facebook --page <粉專名>
+```
+
+共用選項：`--limit <n>`（預設 50）、`--out <path>`（預設 `data/<platform>-<目標>.csv`）、`--headful`（顯示瀏覽器除錯）、`--auth <path>`（指定 session 檔）。
+
+## 各平台可靠度（誠實說明）
+
+| 平台 | 方式 | 可靠度 | 備註 |
+|------|------|--------|------|
+| 蝦皮 | 真實瀏覽器帶 cookie 打內部 JSON API | 較高 | 欄位最全；蝦皮改 API 或加強人機驗證時需更新端點 |
+| Threads | 攔截 GraphQL JSON + 遞迴收割 | 中 | 公開貼文多半拿得到；登入後更穩 |
+| Instagram | 同上 | 中偏低 | 登入牆重，**強烈建議先 `login`** |
+| Facebook | DOM 抽取 | 低 | 反爬最強、HTML 全亂數，務必先 `login`，結構一改就需調整選擇器 |
+
+設計上刻意**用「資料形狀」遞迴尋找**（`walk.ts`）而非鎖死 HTML class / JSON 路徑，平台小改版時較不易整支壞掉；真正大改時，主要改 `shopee.ts` 的端點或 `facebook.ts` 的選擇器即可。
+
+`data/`（輸出）與 `.auth/`（登入 session）已加入 `.gitignore`，**不會被 commit**。
+
+---
 
 ## 設計取捨
 
