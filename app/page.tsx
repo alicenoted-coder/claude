@@ -1,524 +1,403 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import { compressImage } from "@/lib/compress";
-import type {
-  PhotoState,
-  RecognizedItem,
-  RecognizeResponseBody,
-} from "@/lib/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Todo } from "@/lib/todo-types";
+import {
+  PRIORITY_LABEL,
+  buildSortedTree,
+  loadInbox,
+  loadTodos,
+  parsedToTodos,
+  saveInbox,
+  saveTodos,
+  genId,
+} from "@/lib/todo-store";
+import { parseInbox } from "@/lib/todo-parse";
+import {
+  notificationPermission,
+  requestNotificationPermission,
+  scheduleReminders,
+} from "@/lib/todo-reminders";
 
-interface GroupedItem {
-  id: string;
-  item: RecognizedItem;
-  photoIndex: number;
+const INBOX_PLACEHOLDER = `在這裡自由打字，一行一個任務，不用碰按鈕：
+
+買牛奶
+寫週報 @明天 14:00 !remind !p1
+  整理數據          ← 縮排兩格 = 子項目
+回信 @2026-06-20 #工作
+[x] 已完成的事
+
+整理好按下方按鈕，就會送進右邊主清單。`;
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const mm = d.getMonth() + 1;
+  const dd = d.getDate();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${mm}/${dd} ${hh}:${mi}`;
 }
 
-interface CategoryGroup {
-  category: string;
-  items: GroupedItem[];
-}
+export default function TodoPage() {
+  const [mounted, setMounted] = useState(false);
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [inbox, setInbox] = useState("");
+  const [quickAdd, setQuickAdd] = useState("");
+  const [permission, setPermission] = useState<string>("default");
 
-export default function Home() {
-  const [photos, setPhotos] = useState<PhotoState[]>([]);
-  const [running, setRunning] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [copiedAt, setCopiedAt] = useState<number>(0);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const addFiles = useCallback((files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const next: PhotoState[] = [];
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith("image/")) continue;
-      next.push({
-        id: `${file.name}-${file.lastModified}-${Math.random()
-          .toString(36)
-          .slice(2, 8)}`,
-        file,
-        previewUrl: URL.createObjectURL(file),
-        status: "pending",
-      });
-    }
-    setPhotos((prev) => [...prev, ...next]);
+  // 初次掛載：從 localStorage 讀資料（避免 SSR / hydration 不一致）
+  useEffect(() => {
+    setTodos(loadTodos());
+    setInbox(loadInbox());
+    setPermission(notificationPermission());
+    setMounted(true);
   }, []);
 
-  const removePhoto = useCallback((id: string) => {
-    setPhotos((prev) => {
-      const target = prev.find((p) => p.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return prev.filter((p) => p.id !== id);
-    });
-    setSelected((prev) => {
-      const next = new Set(prev);
-      for (const key of prev) if (key.startsWith(`${id}:`)) next.delete(key);
-      return next;
-    });
-  }, []);
+  // todos 變動就存檔 + 重排提醒
+  useEffect(() => {
+    if (!mounted) return;
+    saveTodos(todos);
+  }, [todos, mounted]);
 
-  const clearAll = useCallback(() => {
-    setPhotos((prev) => {
-      prev.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-      return [];
-    });
-    setSelected(new Set());
-  }, []);
+  useEffect(() => {
+    if (!mounted) return;
+    return scheduleReminders(todos);
+  }, [todos, mounted]);
 
-  const recognizeAll = useCallback(async () => {
-    if (running || photos.length === 0) return;
-    setRunning(true);
+  // 收件匣即時存檔
+  useEffect(() => {
+    if (!mounted) return;
+    saveInbox(inbox);
+  }, [inbox, mounted]);
 
-    setPhotos((prev) =>
-      prev.map((p) =>
-        p.status === "done" ? p : { ...p, status: "compressing", error: undefined }
-      )
-    );
-
-    const targets = photos.filter((p) => p.status !== "done");
-
-    const processOne = async (photo: PhotoState) => {
-      try {
-        const compressed = await compressImage(photo.file);
-        setPhotos((prev) =>
-          prev.map((p) =>
-            p.id === photo.id ? { ...p, status: "recognizing" } : p
-          )
-        );
-
-        const maxAttempts = 4;
-        let lastError = "";
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          const res = await fetch("/api/recognize", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              image: compressed.base64,
-              mimeType: compressed.mimeType,
-            }),
-          });
-
-          if (res.ok) {
-            const data = (await res.json()) as RecognizeResponseBody;
-            setPhotos((prev) =>
-              prev.map((p) =>
-                p.id === photo.id
-                  ? { ...p, status: "done", items: data.items }
-                  : p
-              )
-            );
-            return;
-          }
-
-          const errBody = (await res.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          lastError = errBody.error ?? `HTTP ${res.status}`;
-
-          const isRateLimit =
-            res.status === 429 || /\b429\b/.test(lastError);
-          const isServerErr =
-            res.status >= 500 || /\b5\d\d\b/.test(lastError);
-          if ((!isRateLimit && !isServerErr) || attempt === maxAttempts) break;
-
-          const baseMs = isRateLimit ? 7000 : 1500;
-          const backoffMs = baseMs * 2 ** (attempt - 1) + Math.random() * 1000;
-          await new Promise((r) => setTimeout(r, backoffMs));
-        }
-        throw new Error(lastError || "Unknown error");
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        setPhotos((prev) =>
-          prev.map((p) =>
-            p.id === photo.id ? { ...p, status: "error", error: message } : p
-          )
-        );
-      }
-    };
-
-    const concurrency = 1;
-    const queue = [...targets];
-    const workers = Array.from(
-      { length: Math.min(concurrency, queue.length) },
-      async () => {
-        while (queue.length > 0) {
-          const next = queue.shift();
-          if (!next) break;
-          await processOne(next);
-        }
-      }
-    );
-    await Promise.all(workers);
-
-    setRunning(false);
-  }, [photos, running]);
-
-  const grouped = useMemo<CategoryGroup[]>(() => {
-    const map = new Map<string, GroupedItem[]>();
-    photos.forEach((photo, photoIndex) => {
-      photo.items?.forEach((item, j) => {
-        const cat = item.category || "其他";
-        if (!map.has(cat)) map.set(cat, []);
-        map.get(cat)!.push({
-          id: `${photo.id}:${j}`,
-          item,
-          photoIndex,
-        });
-      });
-    });
-    return Array.from(map.entries())
-      .map(([category, items]) => ({
-        category,
-        items: items.sort((a, b) => b.item.confidence - a.item.confidence),
-      }))
-      .sort((a, b) => b.items.length - a.items.length);
-  }, [photos]);
-
-  const allIds = useMemo(
-    () => grouped.flatMap((g) => g.items.map((i) => i.id)),
-    [grouped]
+  const tree = useMemo(() => buildSortedTree(todos), [todos]);
+  const remaining = useMemo(
+    () => todos.filter((t) => !t.done).length,
+    [todos],
   );
-  const totalItems = allIds.length;
-  const selectedCount = allIds.reduce(
-    (n, id) => n + (selected.has(id) ? 1 : 0),
-    0
+
+  const appendTodos = useCallback((newTodos: Todo[]) => {
+    if (newTodos.length === 0) return;
+    setTodos((prev) => [...prev, ...newTodos]);
+  }, []);
+
+  // 收件匣 → 主清單（方案 B 的「整理」動作）
+  const processInbox = useCallback(() => {
+    const lines = parseInbox(inbox);
+    if (lines.length === 0) return;
+    const startOrder = todos.length;
+    appendTodos(parsedToTodos(lines, startOrder));
+    setInbox(""); // 整理完清空收件匣
+  }, [inbox, todos.length, appendTodos]);
+
+  const handleQuickAdd = useCallback(() => {
+    const lines = parseInbox(quickAdd);
+    if (lines.length === 0) return;
+    appendTodos(parsedToTodos(lines, todos.length));
+    setQuickAdd("");
+  }, [quickAdd, todos.length, appendTodos]);
+
+  const toggleDone = useCallback((id: string) => {
+    setTodos((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              done: !t.done,
+              completedAt: !t.done ? Date.now() : null,
+            }
+          : t,
+      ),
+    );
+  }, []);
+
+  const updateTodo = useCallback((id: string, patch: Partial<Todo>) => {
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  }, []);
+
+  const deleteTodo = useCallback((id: string) => {
+    // 連同子項目一起刪
+    setTodos((prev) => prev.filter((t) => t.id !== id && t.parentId !== id));
+  }, []);
+
+  const addChild = useCallback(
+    (parentId: string) => {
+      const child: Todo = {
+        id: genId(),
+        content: "新的子項目",
+        done: false,
+        parentId,
+        createdAt: Date.now(),
+        dueAt: null,
+        completedAt: null,
+        remindAt: null,
+        priority: 0,
+        tags: [],
+        order: todos.length,
+      };
+      appendTodos([child]);
+    },
+    [todos.length, appendTodos],
   );
-  const allSelected = totalItems > 0 && selectedCount === totalItems;
 
-  const toggleOne = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const askPermission = useCallback(async () => {
+    const result = await requestNotificationPermission();
+    setPermission(result);
   }, []);
 
-  const toggleAll = useCallback(() => {
-    setSelected((prev) => {
-      if (prev.size > 0) return new Set();
-      return new Set(allIds);
-    });
-  }, [allIds]);
-
-  const toggleCategory = useCallback((group: CategoryGroup) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      const allOn = group.items.every((i) => next.has(i.id));
-      if (allOn) {
-        group.items.forEach((i) => next.delete(i.id));
-      } else {
-        group.items.forEach((i) => next.add(i.id));
-      }
-      return next;
-    });
-  }, []);
-
-  const copySelected = useCallback(async () => {
-    if (selectedCount === 0) return;
-    const lines: string[] = [];
-    for (const group of grouped) {
-      for (const { id, item } of group.items) {
-        if (!selected.has(id)) continue;
-        const brand = item.brand?.trim();
-        lines.push(brand ? `${item.name}（${brand}）` : item.name);
-      }
-    }
-    const text = lines.join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedAt(Date.now());
-    } catch {
-      // Fallback: open a textarea modal? For now, just alert.
-      window.prompt("無法自動複製，請手動複製以下內容：", text);
-    }
-  }, [grouped, selected, selectedCount]);
-
-  const hasAnyDone = photos.some((p) => p.status === "done");
-  const allDone = photos.length > 0 && photos.every((p) => p.status === "done");
-  const justCopied = copiedAt > 0 && Date.now() - copiedAt < 2000;
+  if (!mounted) {
+    return (
+      <main className="mx-auto max-w-5xl p-6 text-sm opacity-60">載入中…</main>
+    );
+  }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6 sm:py-10 pb-32">
-      <header className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-          家用品盤點 → 二手販售清單
-        </h1>
-        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          拍家裡的東西，AI 列出可販售物品。勾選後複製清單貼到上架平台。
-        </p>
+    <main className="mx-auto max-w-5xl p-4 sm:p-6">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">📝 我的 Todo</h1>
+          <p className="text-sm opacity-60">
+            收件匣隨手丟 → 整理進主清單。資料存在這台裝置的瀏覽器。
+          </p>
+        </div>
+        {permission !== "granted" && permission !== "unsupported" && (
+          <button
+            onClick={askPermission}
+            className="rounded-lg border border-black/15 px-3 py-1.5 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+          >
+            🔔 開啟提醒通知
+          </button>
+        )}
+        {permission === "granted" && (
+          <span className="text-sm opacity-60">🔔 提醒已開啟</span>
+        )}
       </header>
 
-      <section className="space-y-3">
-        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-row">
-          <button
-            type="button"
-            onClick={() => cameraInputRef.current?.click()}
-            disabled={running}
-            className="rounded-lg bg-neutral-900 text-white px-4 py-3 text-sm font-medium disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-          >
-            📷 拍照
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={running}
-            className="rounded-lg border border-neutral-300 px-4 py-3 text-sm font-medium disabled:opacity-50 dark:border-neutral-700"
-          >
-            🖼️ 選照片
-          </button>
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              addFiles(e.target.files);
-              e.target.value = "";
-            }}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* 收件匣 */}
+        <section className="flex flex-col">
+          <h2 className="mb-2 text-lg font-semibold">📥 收件匣</h2>
+          <textarea
+            value={inbox}
+            onChange={(e) => setInbox(e.target.value)}
+            placeholder={INBOX_PLACEHOLDER}
+            spellCheck={false}
+            className="h-72 w-full resize-y rounded-lg border border-black/15 bg-transparent p-3 font-mono text-sm leading-relaxed outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
           />
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              addFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </div>
+          <button
+            onClick={processInbox}
+            className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+            disabled={!inbox.trim()}
+          >
+            ⬇️ 整理進主清單
+          </button>
+          <details className="mt-3 text-xs opacity-70">
+            <summary className="cursor-pointer select-none">語法說明</summary>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li><code>@明天 14:00</code> / <code>@2026-06-20</code>：截止時間</li>
+              <li><code>!remind</code>：開啟提醒（用截止時間）</li>
+              <li><code>!p1</code> / <code>!p2</code> / <code>!p3</code>：優先級（p1 最高）</li>
+              <li><code>#標籤</code>：分類標籤</li>
+              <li>每行開頭縮排兩格：變成上一行的子項目</li>
+              <li><code>[x]</code> 開頭：標記為已完成</li>
+            </ul>
+          </details>
+        </section>
 
-        {photos.length > 0 && (
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">
-              已選 {photos.length} 張
-            </p>
+        {/* 主清單 */}
+        <section className="flex flex-col">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">✅ 主清單</h2>
+            <span className="text-sm opacity-60">還有 {remaining} 件</span>
+          </div>
+
+          <div className="mb-3 flex gap-2">
+            <input
+              value={quickAdd}
+              onChange={(e) => setQuickAdd(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleQuickAdd();
+              }}
+              placeholder="直接新增一筆… (可用 @ ! # 語法)"
+              className="flex-1 rounded-lg border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+            />
             <button
-              type="button"
-              onClick={clearAll}
-              disabled={running}
-              className="text-sm text-neutral-500 underline disabled:opacity-50"
+              onClick={handleQuickAdd}
+              className="rounded-lg border border-black/15 px-3 py-2 text-sm hover:bg-black/5 disabled:opacity-40 dark:border-white/20 dark:hover:bg-white/10"
+              disabled={!quickAdd.trim()}
             >
-              全部清除
+              新增
             </button>
           </div>
-        )}
 
-        {photos.length > 0 && (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {photos.map((photo, idx) => (
-              <PhotoThumb
-                key={photo.id}
-                photo={photo}
-                index={idx}
-                onRemove={() => removePhoto(photo.id)}
-                disabled={running}
-              />
-            ))}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={recognizeAll}
-          disabled={running || photos.length === 0 || allDone}
-          className="w-full rounded-lg bg-blue-600 text-white px-4 py-4 text-base font-semibold disabled:opacity-50 hover:bg-blue-700 transition-colors"
-        >
-          {running
-            ? "辨識中…"
-            : allDone
-            ? "已全部完成"
-            : `🤖 開始辨識 (${photos.filter((p) => p.status !== "done").length})`}
-        </button>
-      </section>
-
-      {hasAnyDone && (
-        <section className="mt-8">
-          <div className="flex items-center justify-between mb-3 gap-3">
-            <h2 className="text-lg font-semibold">
-              盤點清單{" "}
-              <span className="text-neutral-500 font-normal">
-                （共 {totalItems} 項）
-              </span>
-            </h2>
-            {totalItems > 0 && (
-              <button
-                type="button"
-                onClick={toggleAll}
-                className="text-sm text-blue-600 underline"
-              >
-                {allSelected ? "全不選" : "全選"}
-              </button>
-            )}
-          </div>
-          {totalItems === 0 ? (
-            <p className="text-sm text-neutral-500">沒有辨識到可販售的物品。</p>
+          {tree.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-black/15 p-6 text-center text-sm opacity-50 dark:border-white/20">
+              還沒有任務。從左邊收件匣整理進來，或用上面的欄位新增。
+            </p>
           ) : (
-            <div className="space-y-4">
-              {grouped.map((group) => {
-                const groupSelectedCount = group.items.filter((i) =>
-                  selected.has(i.id)
-                ).length;
-                return (
-                  <div
-                    key={group.category}
-                    className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleCategory(group)}
-                      className="w-full bg-neutral-50 dark:bg-neutral-900 px-4 py-2 text-sm font-medium flex items-center justify-between hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{group.category}</span>
-                        {groupSelectedCount > 0 && (
-                          <span className="text-xs text-blue-600 font-normal">
-                            （已選 {groupSelectedCount}）
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-neutral-500 font-normal">
-                        {group.items.length}
-                      </span>
-                    </button>
-                    <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                      {group.items.map(({ id, item, photoIndex }) => {
-                        const isSelected = selected.has(id);
-                        const brand = item.brand?.trim();
-                        return (
-                          <li
-                            key={id}
-                            className={`px-3 py-2 flex items-center gap-3 text-sm cursor-pointer transition-colors ${
-                              isSelected
-                                ? "bg-blue-50 dark:bg-blue-950/40"
-                                : "hover:bg-neutral-50 dark:hover:bg-neutral-900/50"
-                            }`}
-                            onClick={() => toggleOne(id)}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleOne(id)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-4 h-4 accent-blue-600 flex-shrink-0"
-                              aria-label={`選 ${item.name}`}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">
-                                {item.name}
-                              </div>
-                              {brand && (
-                                <div className="text-xs text-neutral-500 truncate">
-                                  {brand}
-                                </div>
-                              )}
-                            </div>
-                            <span className="flex items-center gap-2 text-xs text-neutral-500 flex-shrink-0">
-                              <span>#{photoIndex + 1}</span>
-                              <span className="tabular-nums">
-                                {(item.confidence * 100).toFixed(0)}%
-                              </span>
-                            </span>
-                          </li>
-                        );
-                      })}
+            <ul className="space-y-1">
+              {tree.map(({ todo, children }) => (
+                <li key={todo.id}>
+                  <TodoRow
+                    todo={todo}
+                    onToggle={toggleDone}
+                    onUpdate={updateTodo}
+                    onDelete={deleteTodo}
+                    onAddChild={addChild}
+                  />
+                  {children.length > 0 && (
+                    <ul className="ml-7 mt-1 space-y-1 border-l border-black/10 pl-3 dark:border-white/15">
+                      {children.map((child) => (
+                        <li key={child.id}>
+                          <TodoRow
+                            todo={child}
+                            onToggle={toggleDone}
+                            onUpdate={updateTodo}
+                            onDelete={deleteTodo}
+                          />
+                        </li>
+                      ))}
                     </ul>
-                  </div>
-                );
-              })}
-            </div>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </section>
-      )}
+      </div>
 
-      {hasAnyDone && totalItems > 0 && (
-        <div className="fixed bottom-0 inset-x-0 border-t border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/95 backdrop-blur px-4 py-3">
-          <div className="mx-auto max-w-3xl flex items-center gap-3">
-            <div className="text-sm text-neutral-600 dark:text-neutral-400 flex-1">
-              已勾選{" "}
-              <span className="font-semibold text-neutral-900 dark:text-neutral-100">
-                {selectedCount}
-              </span>{" "}
-              / {totalItems} 項
-            </div>
-            <button
-              type="button"
-              onClick={copySelected}
-              disabled={selectedCount === 0}
-              className="rounded-lg bg-emerald-600 text-white px-4 py-2.5 text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors"
-            >
-              {justCopied ? "✓ 已複製" : `📋 複製勾選 (${selectedCount})`}
-            </button>
-          </div>
-        </div>
-      )}
+      <footer className="mt-10 text-center text-xs opacity-40">
+        本地版本（localStorage）。之後可接 Supabase 做跨裝置雲端同步。
+      </footer>
     </main>
   );
 }
 
-function PhotoThumb({
-  photo,
-  index,
-  onRemove,
-  disabled,
-}: {
-  photo: PhotoState;
-  index: number;
-  onRemove: () => void;
-  disabled: boolean;
-}) {
-  const statusLabel = {
-    pending: "",
-    compressing: "壓縮中",
-    recognizing: "辨識中",
-    done: `${photo.items?.length ?? 0} 項`,
-    error: "失敗",
-  }[photo.status];
+interface RowProps {
+  todo: Todo;
+  onToggle: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<Todo>) => void;
+  onDelete: (id: string) => void;
+  onAddChild?: (parentId: string) => void;
+}
 
-  const statusClass = {
-    pending: "bg-neutral-900/60 text-white",
-    compressing: "bg-amber-500/80 text-white",
-    recognizing: "bg-blue-600/80 text-white",
-    done: "bg-emerald-600/80 text-white",
-    error: "bg-red-600/80 text-white",
-  }[photo.status];
+function TodoRow({ todo, onToggle, onUpdate, onDelete, onAddChild }: RowProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(todo.content);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commitEdit = () => {
+    const next = draft.trim();
+    if (next && next !== todo.content) onUpdate(todo.id, { content: next });
+    else setDraft(todo.content);
+    setEditing(false);
+  };
+
+  const overdue =
+    !todo.done && todo.dueAt !== null && todo.dueAt < Date.now();
 
   return (
-    <div className="relative aspect-square rounded-md overflow-hidden bg-neutral-100 dark:bg-neutral-900 group">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={photo.previewUrl}
-        alt={`photo-${index + 1}`}
-        className="absolute inset-0 w-full h-full object-cover"
+    <div className="group flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+      <input
+        type="checkbox"
+        checked={todo.done}
+        onChange={() => onToggle(todo.id)}
+        className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-blue-600"
       />
-      <div className="absolute top-1 left-1 px-1.5 py-0.5 text-[10px] rounded bg-black/60 text-white">
-        #{index + 1}
+
+      <div className="min-w-0 flex-1">
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitEdit();
+              if (e.key === "Escape") {
+                setDraft(todo.content);
+                setEditing(false);
+              }
+            }}
+            className="w-full rounded border border-black/20 bg-transparent px-1 py-0.5 text-sm outline-none dark:border-white/30"
+          />
+        ) : (
+          <span
+            onClick={() => setEditing(true)}
+            className={`cursor-text break-words text-sm ${
+              todo.done ? "line-through opacity-40" : ""
+            }`}
+          >
+            {todo.content}
+          </span>
+        )}
+
+        {/* 標記列：時間、提醒、優先級、標籤 */}
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+          {todo.dueAt !== null && (
+            <span
+              className={`rounded px-1.5 py-0.5 ${
+                overdue
+                  ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                  : "bg-black/5 opacity-70 dark:bg-white/10"
+              }`}
+            >
+              🗓 {formatTime(todo.dueAt)}
+              {overdue ? " ·逾期" : ""}
+            </span>
+          )}
+          {todo.remindAt !== null && !todo.done && (
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-600 dark:text-amber-400">
+              🔔 {formatTime(todo.remindAt)}
+            </span>
+          )}
+          {todo.priority > 0 && (
+            <span
+              className={`rounded px-1.5 py-0.5 ${
+                todo.priority === 3
+                  ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                  : todo.priority === 2
+                    ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                    : "bg-black/5 opacity-70 dark:bg-white/10"
+              }`}
+            >
+              {PRIORITY_LABEL[todo.priority]}優先
+            </span>
+          )}
+          {todo.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-600 dark:text-blue-400"
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
       </div>
-      {statusLabel && (
-        <div
-          className={`absolute bottom-1 left-1 px-1.5 py-0.5 text-[10px] rounded ${statusClass}`}
-        >
-          {statusLabel}
-        </div>
-      )}
-      {!disabled && (
+
+      {/* 動作：新增子項目、刪除 */}
+      <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+        {onAddChild && (
+          <button
+            onClick={() => onAddChild(todo.id)}
+            title="新增子項目"
+            className="rounded px-1.5 text-sm hover:bg-black/10 dark:hover:bg-white/15"
+          >
+            ＋
+          </button>
+        )}
         <button
-          type="button"
-          onClick={onRemove}
-          className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          aria-label="移除"
+          onClick={() => onDelete(todo.id)}
+          title="刪除"
+          className="rounded px-1.5 text-sm text-red-500 hover:bg-red-500/10"
         >
-          ✕
+          ×
         </button>
-      )}
-      {photo.status === "error" && photo.error && (
-        <div className="absolute inset-x-0 bottom-0 px-1 py-0.5 text-[9px] bg-red-600/90 text-white truncate">
-          {photo.error}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
