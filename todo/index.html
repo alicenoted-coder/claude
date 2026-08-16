@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f7f5">
+<!-- 讓 iPhone「加入主畫面」後可全螢幕、像原生 app -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="待辦">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>我的待辦</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --card:#ffffff; --text:#1d1d1f; --muted:#8a8a8e;
+    --line:#e6e6e3; --accent:#3b82f6; --accent-soft:#eaf1fe;
+    --high:#e5484d; --high-soft:#fdecec;
+    --mid:#f5a623; --mid-soft:#fdf3e3;
+    --low:#30a46c; --low-soft:#e7f6ee;
+    --done:#a0a0a5;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+    --radius:14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1c1c1e; --card:#2c2c2e; --text:#f2f2f7; --muted:#8d8d92;
+      --line:#3a3a3c; --accent:#0a84ff; --accent-soft:#16314f;
+      --high:#ff6961; --high-soft:#3a2526;
+      --mid:#ffb340; --mid-soft:#3a3020;
+      --low:#30d158; --low-soft:#1f3326;
+      --done:#6d6d72;
+      --shadow:0 1px 3px rgba(0,0,0,.3);
+    }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg); color:var(--text);
+    line-height:1.5; font-size:16px;
+    padding-bottom:env(safe-area-inset-bottom);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:0 16px 120px}
+  header{
+    position:sticky;top:0;z-index:20;background:var(--bg);
+    padding:calc(env(safe-area-inset-top) + 14px) 16px 8px;
+    margin:0 -16px 4px;
+  }
+  .title-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  h1{font-size:28px;font-weight:800;margin:0;letter-spacing:-.5px}
+  .date-today{color:var(--muted);font-size:14px;font-weight:600}
+  .tabs{display:flex;gap:6px;margin-top:12px}
+  .tab{
+    flex:1;border:none;background:transparent;color:var(--muted);
+    font-size:15px;font-weight:700;padding:8px 4px;border-radius:10px;cursor:pointer;
+  }
+  .tab.active{background:var(--card);color:var(--text);box-shadow:var(--shadow)}
+
+  /* 群組 */
+  .group{margin-top:18px}
+  .group-head{display:flex;align-items:center;gap:8px;margin:0 4px 8px}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .dot.high{background:var(--high)} .dot.mid{background:var(--mid)} .dot.low{background:var(--low)}
+  .group-title{font-size:13px;font-weight:800;letter-spacing:.3px;text-transform:none}
+  .group-count{color:var(--muted);font-size:13px;font-weight:600}
+
+  /* 卡片 */
+  .card{
+    background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    margin-bottom:10px;overflow:hidden;
+  }
+  .row{display:flex;align-items:flex-start;gap:12px;padding:14px 14px}
+  .check{
+    flex:0 0 auto;width:24px;height:24px;border-radius:50%;
+    border:2px solid var(--line);margin-top:1px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:.15s;
+  }
+  .check.high{border-color:var(--high)} .check.mid{border-color:var(--mid)} .check.low{border-color:var(--low)}
+  .check.checked{background:var(--accent);border-color:var(--accent)}
+  .check.checked::after{content:"";width:6px;height:11px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translateY(-1px)}
+  .main{flex:1;min-width:0;cursor:pointer}
+  .ttl{font-size:16px;font-weight:600;word-break:break-word}
+  .ttl.done{color:var(--done);text-decoration:line-through}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+  .chip{
+    font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;
+    background:var(--bg);color:var(--muted);display:inline-flex;align-items:center;gap:4px;
+  }
+  .chip.due{background:var(--accent-soft);color:var(--accent)}
+  .chip.overdue{background:var(--high-soft);color:var(--high)}
+  .chip.rep{background:var(--low-soft);color:var(--low)}
+  .chip.sub{background:var(--bg);color:var(--muted)}
+  .chip.notewhen{color:var(--muted)}
+  .expander{flex:0 0 auto;color:var(--muted);font-size:13px;padding:2px 4px;cursor:pointer;user-select:none}
+
+  /* 展開明細 */
+  .detail{border-top:1px solid var(--line);padding:14px;display:none;background:var(--card)}
+  .detail.open{display:block}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .field input[type=text],.field input[type=date],.field select,.field textarea{
+    width:100%;border:1px solid var(--line);background:var(--bg);color:var(--text);
+    border-radius:10px;padding:9px 11px;font-size:15px;font-family:inherit;
+  }
+  .field textarea{resize:vertical;min-height:56px}
+  .field-3{display:flex;gap:8px}.field-3>div{flex:1}
+  .subs{list-style:none;margin:0;padding:0}
+  .sub-item{display:flex;align-items:center;gap:9px;padding:5px 0}
+  .sub-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--line);flex:0 0 auto;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .sub-check.checked{background:var(--low);border-color:var(--low)}
+  .sub-check.checked::after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .sub-item input{flex:1;border:none;background:transparent;color:var(--text);font-size:15px;padding:4px 0}
+  .sub-item input.done{color:var(--done);text-decoration:line-through}
+  .sub-del{color:var(--muted);background:none;border:none;font-size:18px;cursor:pointer;padding:0 4px}
+  .sub-add{display:flex;gap:8px;margin-top:6px}
+  .sub-add input{flex:1;border:1px dashed var(--line);background:transparent;color:var(--text);border-radius:8px;padding:7px 10px;font-size:14px}
+  .detail-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+  .btn-del{color:var(--high);background:none;border:none;font-size:14px;font-weight:700;cursor:pointer;padding:6px 2px}
+  .btn-small{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:14px;font-weight:700;cursor:pointer}
+
+  /* 空狀態 */
+  .empty{text-align:center;color:var(--muted);padding:60px 20px}
+  .empty .big{font-size:40px;margin-bottom:10px}
+
+  /* 已完成 */
+  .done-actions{display:flex;justify-content:flex-end;margin:6px 4px}
+  .link-btn{background:none;border:none;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer}
+
+  /* 新增列（底部固定） */
+  .composer{
+    position:fixed;left:0;right:0;bottom:0;z-index:30;
+    background:var(--card);border-top:1px solid var(--line);
+    padding:10px 16px calc(env(safe-area-inset-bottom) + 10px);
+    box-shadow:0 -2px 10px rgba(0,0,0,.05);
+  }
+  .composer-inner{max-width:680px;margin:0 auto;display:flex;gap:8px;align-items:center}
+  #newTitle{flex:1;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:12px 14px;font-size:16px}
+  #newPrio{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:0 8px;font-size:14px;font-weight:700;height:46px}
+  .add-btn{flex:0 0 auto;width:46px;height:46px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:26px;font-weight:300;line-height:1;cursor:pointer}
+  .composer-more{max-width:680px;margin:8px auto 0;display:none;gap:8px}
+  .composer-more.open{display:flex}
+  .composer-more input,.composer-more select{flex:1;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:10px;padding:8px 10px;font-size:14px}
+  .toggle-more{background:none;border:none;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;padding:6px 0 0;display:block;margin:0 auto}
+
+  /* 設定 / 備份 */
+  .settings{margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
+  .settings h2{font-size:14px;color:var(--muted);margin:0 0 10px}
+  .settings .stack{display:flex;flex-direction:column;gap:8px}
+  .settings button{text-align:left;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 14px;font-size:15px;cursor:pointer}
+  .settings .hint{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.6}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#000;color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+  .toast.show{opacity:.92}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title-row">
+      <h1>我的待辦</h1>
+      <span class="date-today" id="todayLabel"></span>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-view="active" id="tabActive">進行中</button>
+      <button class="tab" data-view="done" id="tabDone">已完成</button>
+    </div>
+  </header>
+
+  <main id="list"></main>
+
+  <section class="settings" id="settings">
+    <h2>備份與還原</h2>
+    <div class="stack">
+      <button id="exportBtn">⬇️ 匯出備份（存成檔案）</button>
+      <button id="importBtn">⬆️ 匯入備份（從檔案還原）</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>
+    <p class="hint">
+      資料只存在這台裝置上。iPhone 跟 Mac 想用同一份資料時，<br>
+      在一邊「匯出備份」、傳到另一邊「匯入備份」即可。
+    </p>
+  </section>
+</div>
+
+<!-- 底部新增列 -->
+<div class="composer">
+  <div class="composer-inner">
+    <input type="text" id="newTitle" placeholder="新增待辦事項…" autocomplete="off" enterkeyhint="done">
+    <select id="newPrio" title="重要程度">
+      <option value="high">🔴 高</option>
+      <option value="mid" selected>🟡 中</option>
+      <option value="low">🟢 低</option>
+    </select>
+    <button class="add-btn" id="addBtn" aria-label="新增">＋</button>
+  </div>
+  <div class="composer-more" id="composerMore">
+    <input type="date" id="newDue" title="到期日">
+    <select id="newRepeat" title="重複">
+      <option value="none">不重複</option>
+      <option value="daily">每天</option>
+      <option value="weekly">每週</option>
+      <option value="monthly">每月</option>
+    </select>
+  </div>
+  <button class="toggle-more" id="toggleMore">＋ 到期日／重複</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+(function(){
+  const KEY = "mytodo.v1";
+  const $ = s => document.querySelector(s);
+  const PRIO = { high:{label:"高",cls:"high",order:0}, mid:{label:"中",cls:"mid",order:1}, low:{label:"低",cls:"low",order:2} };
+  const REPEAT_LABEL = { daily:"每天", weekly:"每週", monthly:"每月" };
+  const WEEKDAY = ["週日","週一","週二","週三","週四","週五","週六"];
+
+  let state = load();
+  let view = "active";
+  const openIds = new Set();   // 展開中的卡片
+
+  // ---------- 資料 ----------
+  function load(){
+    try{ const raw = localStorage.getItem(KEY); if(raw) return JSON.parse(raw); }catch(e){}
+    return { tasks: [] };
+  }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  // ---------- 日期工具 ----------
+  function todayStr(){ const d=new Date(); return ymd(d); }
+  function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function parseYmd(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+  function nextDue(dueStr, repeat){
+    const base = dueStr ? parseYmd(dueStr) : new Date();
+    if(repeat==="daily") base.setDate(base.getDate()+1);
+    else if(repeat==="weekly") base.setDate(base.getDate()+7);
+    else if(repeat==="monthly") base.setMonth(base.getMonth()+1);
+    return ymd(base);
+  }
+  function humanDue(dueStr){
+    const today = parseYmd(todayStr()), due = parseYmd(dueStr);
+    const diff = Math.round((due - today)/86400000);
+    if(diff < 0) return { text:(diff===-1?"昨天":(-diff)+"天前"), overdue:true };
+    if(diff === 0) return { text:"今天", overdue:false, soon:true };
+    if(diff === 1) return { text:"明天", overdue:false, soon:true };
+    if(diff <= 6) return { text:WEEKDAY[due.getDay()], overdue:false };
+    const sameYear = due.getFullYear()===today.getFullYear();
+    return { text:(sameYear?"":due.getFullYear()+"/")+(due.getMonth()+1)+"/"+due.getDate(), overdue:false };
+  }
+  function humanDoneAt(iso){
+    const d=new Date(iso), today=parseYmd(todayStr()), that=parseYmd(ymd(d));
+    const diff=Math.round((today-that)/86400000);
+    let day = diff===0?"今天":diff===1?"昨天":(d.getMonth()+1)+"/"+d.getDate();
+    return day+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  }
+
+  // ---------- 動作 ----------
+  function addTask(){
+    const title = $("#newTitle").value.trim();
+    if(!title) return;
+    const t = {
+      id: uid(), title,
+      priority: $("#newPrio").value,
+      due: $("#newDue").value || null,
+      repeat: $("#newRepeat").value,
+      note:"", subtasks:[], done:false, doneAt:null,
+      createdAt: new Date().toISOString()
+    };
+    state.tasks.push(t); save();
+    $("#newTitle").value=""; $("#newDue").value=""; $("#newRepeat").value="none";
+    $("#composerMore").classList.remove("open");
+    render(); $("#newTitle").focus();
+  }
+  function toggleDone(t){
+    if(!t.done){
+      // 完成。若有重複，先生出下一個進行中的同事項
+      if(t.repeat && t.repeat!=="none"){
+        state.tasks.push({
+          id:uid(), title:t.title, priority:t.priority,
+          due: nextDue(t.due, t.repeat), repeat:t.repeat,
+          note:t.note, subtasks:t.subtasks.map(s=>({id:uid(),title:s.title,done:false})),
+          done:false, doneAt:null, createdAt:new Date().toISOString()
+        });
+        toast("已完成，下一次已自動排好");
+      }
+      t.done=true; t.doneAt=new Date().toISOString();
+    }else{
+      t.done=false; t.doneAt=null;
+    }
+    save(); render();
+  }
+  function del(t){
+    state.tasks = state.tasks.filter(x=>x.id!==t.id);
+    save(); render();
+  }
+  function patch(t, k, v){ t[k]=v; save(); }
+
+  // ---------- 畫面 ----------
+  function render(){
+    $("#todayLabel").textContent = (()=>{ const d=new Date(); return (d.getMonth()+1)+"月"+d.getDate()+"日 "+WEEKDAY[d.getDay()]; })();
+    $("#tabActive").classList.toggle("active", view==="active");
+    $("#tabDone").classList.toggle("active", view==="done");
+    $("#settings").style.display = view==="active" ? "block" : "none";
+    const list = $("#list"); list.innerHTML="";
+    view==="active" ? renderActive(list) : renderDone(list);
+  }
+
+  function sortActive(arr){
+    return arr.sort((a,b)=>{
+      const ad=a.due?parseYmd(a.due).getTime():Infinity, bd=b.due?parseYmd(b.due).getTime():Infinity;
+      if(ad!==bd) return ad-bd;
+      return new Date(a.createdAt)-new Date(b.createdAt);
+    });
+  }
+
+  function renderActive(list){
+    const active = state.tasks.filter(t=>!t.done);
+    if(active.length===0){
+      list.innerHTML = '<div class="empty"><div class="big">🎉</div>目前沒有待辦事項<br>在下面新增一筆吧</div>';
+      return;
+    }
+    ["high","mid","low"].forEach(p=>{
+      const items = sortActive(active.filter(t=>t.priority===p));
+      if(items.length===0) return;
+      const g=document.createElement("div"); g.className="group";
+      g.innerHTML = `<div class="group-head"><span class="dot ${p}"></span>`+
+        `<span class="group-title">${PRIO[p].label}</span>`+
+        `<span class="group-count">${items.length}</span></div>`;
+      items.forEach(t=>g.appendChild(card(t)));
+      list.appendChild(g);
+    });
+  }
+
+  function renderDone(list){
+    const done = state.tasks.filter(t=>t.done).sort((a,b)=>new Date(b.doneAt)-new Date(a.doneAt));
+    if(done.length===0){
+      list.innerHTML = '<div class="empty"><div class="big">📭</div>還沒有完成的事項</div>';
+      return;
+    }
+    const bar=document.createElement("div"); bar.className="done-actions";
+    bar.innerHTML='<button class="link-btn" id="clearDone">清空已完成紀錄</button>';
+    list.appendChild(bar);
+    bar.querySelector("#clearDone").onclick=()=>{
+      if(confirm("確定要清空所有已完成紀錄？此動作無法復原。")){
+        state.tasks=state.tasks.filter(t=>!t.done); save(); render();
+      }
+    };
+    done.forEach(t=>list.appendChild(card(t)));
+  }
+
+  function card(t){
+    const c=document.createElement("div"); c.className="card";
+    const row=document.createElement("div"); row.className="row";
+
+    // 勾選圈
+    const chk=document.createElement("div");
+    chk.className="check "+PRIO[t.priority].cls+(t.done?" checked":"");
+    chk.onclick=e=>{ e.stopPropagation(); toggleDone(t); };
+    row.appendChild(chk);
+
+    // 主體
+    const main=document.createElement("div"); main.className="main";
+    const ttl=document.createElement("div"); ttl.className="ttl"+(t.done?" done":""); ttl.textContent=t.title;
+    main.appendChild(ttl);
+
+    const meta=document.createElement("div"); meta.className="meta";
+    if(t.done){
+      const ch=document.createElement("span"); ch.className="chip"; ch.textContent="完成於 "+humanDoneAt(t.doneAt); meta.appendChild(ch);
+    }else if(t.due){
+      const h=humanDue(t.due);
+      const ch=document.createElement("span");
+      ch.className="chip "+(h.overdue?"overdue":"due"); ch.textContent="📅 "+h.text; meta.appendChild(ch);
+    }
+    if(t.repeat && t.repeat!=="none"){
+      const ch=document.createElement("span"); ch.className="chip rep"; ch.textContent="🔁 "+REPEAT_LABEL[t.repeat]; meta.appendChild(ch);
+    }
+    const subDone=t.subtasks.filter(s=>s.done).length;
+    if(t.subtasks.length){
+      const ch=document.createElement("span"); ch.className="chip sub"; ch.textContent="☑︎ "+subDone+"/"+t.subtasks.length; meta.appendChild(ch);
+    }
+    if(t.note && t.note.trim()){
+      const ch=document.createElement("span"); ch.className="chip notewhen"; ch.textContent="📝 備註"; meta.appendChild(ch);
+    }
+    if(meta.children.length) main.appendChild(meta);
+
+    main.onclick=()=>{ if(openIds.has(t.id))openIds.delete(t.id); else openIds.add(t.id); renderDetail(); };
+    row.appendChild(main);
+
+    const exp=document.createElement("div"); exp.className="expander"; exp.textContent = openIds.has(t.id)?"收合":"展開";
+    exp.onclick=()=>{ if(openIds.has(t.id))openIds.delete(t.id); else openIds.add(t.id); renderDetail(); };
+    row.appendChild(exp);
+
+    c.appendChild(row);
+    c.appendChild(detail(t));
+    return c;
+  }
+
+  function renderDetail(){ render(); }   // 簡單起見，重畫即可（openIds 會保留展開狀態）
+
+  function detail(t){
+    const d=document.createElement("div");
+    d.className="detail"+(openIds.has(t.id)?" open":"");
+
+    // 標題
+    d.appendChild(fieldText("標題", t.title, v=>{ patch(t,"title",v); }));
+
+    // 重要程度 / 到期日 / 重複
+    const three=document.createElement("div"); three.className="field field-3";
+    three.appendChild(wrapField("重要程度", selectEl(
+      [["high","🔴 高"],["mid","🟡 中"],["low","🟢 低"]], t.priority, v=>{ patch(t,"priority",v); render(); })));
+    three.appendChild(wrapField("到期日", dateEl(t.due, v=>{ patch(t,"due",v||null); render(); })));
+    three.appendChild(wrapField("重複", selectEl(
+      [["none","不重複"],["daily","每天"],["weekly","每週"],["monthly","每月"]], t.repeat||"none", v=>{ patch(t,"repeat",v); render(); })));
+    d.appendChild(three);
+
+    // 備註
+    d.appendChild(fieldArea("備註", t.note||"", v=>{ patch(t,"note",v); }));
+
+    // 子項目
+    const subWrap=document.createElement("div"); subWrap.className="field";
+    const lab=document.createElement("label"); lab.textContent="子項目"; subWrap.appendChild(lab);
+    const ul=document.createElement("ul"); ul.className="subs";
+    t.subtasks.forEach(s=>{
+      const li=document.createElement("li"); li.className="sub-item";
+      const sc=document.createElement("div"); sc.className="sub-check"+(s.done?" checked":"");
+      sc.onclick=()=>{ s.done=!s.done; save(); render(); };
+      const inp=document.createElement("input"); inp.value=s.title; inp.className=s.done?"done":"";
+      inp.onchange=()=>{ s.title=inp.value; save(); };
+      const dl=document.createElement("button"); dl.className="sub-del"; dl.textContent="×";
+      dl.onclick=()=>{ t.subtasks=t.subtasks.filter(x=>x.id!==s.id); save(); render(); };
+      li.append(sc,inp,dl); ul.appendChild(li);
+    });
+    subWrap.appendChild(ul);
+    const addRow=document.createElement("div"); addRow.className="sub-add";
+    const ai=document.createElement("input"); ai.placeholder="新增子項目…"; ai.enterKeyHint="done";
+    const addSub=()=>{ const v=ai.value.trim(); if(!v)return; t.subtasks.push({id:uid(),title:v,done:false}); save(); render(); };
+    ai.onkeydown=e=>{ if(e.key==="Enter") addSub(); };
+    const ab=document.createElement("button"); ab.className="btn-small"; ab.textContent="加入"; ab.onclick=addSub;
+    addRow.append(ai,ab); subWrap.appendChild(addRow);
+    d.appendChild(subWrap);
+
+    // 底部動作
+    const act=document.createElement("div"); act.className="detail-actions";
+    const del2=document.createElement("button"); del2.className="btn-del"; del2.textContent="🗑 刪除這筆";
+    del2.onclick=()=>{ if(confirm("確定刪除「"+t.title+"」？")) del(t); };
+    const close=document.createElement("button"); close.className="btn-small"; close.textContent="完成編輯";
+    close.onclick=()=>{ openIds.delete(t.id); render(); };
+    act.append(del2,close);
+    d.appendChild(act);
+    return d;
+  }
+
+  // 小工具
+  function fieldText(label,val,onChange){
+    const w=document.createElement("div"); w.className="field";
+    const l=document.createElement("label"); l.textContent=label;
+    const i=document.createElement("input"); i.type="text"; i.value=val;
+    i.onchange=()=>onChange(i.value.trim());
+    w.append(l,i); return w;
+  }
+  function fieldArea(label,val,onChange){
+    const w=document.createElement("div"); w.className="field";
+    const l=document.createElement("label"); l.textContent=label;
+    const i=document.createElement("textarea"); i.value=val; i.placeholder="寫點細節…";
+    i.onchange=()=>onChange(i.value);
+    w.append(l,i); return w;
+  }
+  function wrapField(label,el){
+    const w=document.createElement("div");
+    const l=document.createElement("label"); l.textContent=label;
+    w.append(l,el); return w;
+  }
+  function selectEl(opts,val,onChange){
+    const s=document.createElement("select");
+    opts.forEach(([v,t])=>{ const o=document.createElement("option"); o.value=v; o.textContent=t; if(v===val)o.selected=true; s.appendChild(o); });
+    s.onchange=()=>onChange(s.value); return s;
+  }
+  function dateEl(val,onChange){
+    const i=document.createElement("input"); i.type="date"; if(val)i.value=val;
+    i.onchange=()=>onChange(i.value); return i;
+  }
+
+  // ---------- 備份 ----------
+  function exportBackup(){
+    const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download="待辦備份-"+todayStr()+".json"; a.click();
+    URL.revokeObjectURL(url); toast("已匯出備份");
+  }
+  function importBackup(file){
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const data=JSON.parse(r.result);
+        if(!data || !Array.isArray(data.tasks)) throw 0;
+        if(confirm("匯入會覆蓋目前資料，確定嗎？")){ state=data; save(); render(); toast("已還原備份"); }
+      }catch(e){ alert("檔案格式不正確，無法匯入。"); }
+    };
+    r.readAsText(file);
+  }
+
+  // ---------- toast ----------
+  let toastTimer;
+  function toast(msg){
+    const el=$("#toast"); el.textContent=msg; el.classList.add("show");
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"),1800);
+  }
+
+  // ---------- 綁定 ----------
+  $("#addBtn").onclick=addTask;
+  $("#newTitle").addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); });
+  $("#toggleMore").onclick=()=>{
+    const m=$("#composerMore"); const open=m.classList.toggle("open");
+    $("#toggleMore").textContent = open ? "－ 收起" : "＋ 到期日／重複";
+  };
+  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{ view=b.dataset.view; render(); });
+  $("#exportBtn").onclick=exportBackup;
+  $("#importBtn").onclick=()=>$("#importFile").click();
+  $("#importFile").onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); e.target.value=""; };
+
+  // service worker（離線可用；用 file:// 開時會自動略過）
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
