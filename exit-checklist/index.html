@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="only light">
+<meta name="theme-color" content="#f5f1e6">
+<meta name="supported-color-schemes" content="light">
+<title>離職 Checklist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Noto+Serif+TC:wght@400;500;600&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f1e6;
+    --card: #fbf8ef;
+    --ink: #2a2723;
+    --ink-soft: #6b665e;
+    --ink-faint: #a39c91;
+    --accent: #c87146;
+    --accent-soft: #e8a785;
+    --moss: #5a6b4f;
+    --gold: #a89968;
+    --line: #e4ddcd;
+    --line-soft: #efeadd;
+    --done-glow: rgba(200, 113, 70, 0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: linear-gradient(180deg, #f5f1e6 0%, #f5f1e6 100%);
+    background-color: #f5f1e6;
+    color-scheme: light;
+    forced-color-adjust: none;
+  }
+
+  body {
+    font-family: 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(180deg, #f5f1e6 0%, #f5f1e6 100%);
+    background-color: #f5f1e6;
+    color: #2a2723;
+    line-height: 1.6;
+    font-size: 15px;
+    padding: 0;
+    min-height: 100vh;
+    forced-color-adjust: none;
+  }
+
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    background: linear-gradient(180deg, #f5f1e6 0%, #f5f1e6 100%);
+    background-color: #f5f1e6;
+    min-height: 100vh;
+  }
+
+  /* === Login (通關密語) === */
+  .login-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 100;
+  }
+
+  .login-card {
+    max-width: 380px;
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 36px 30px 32px;
+    text-align: center;
+  }
+
+  .login-eyebrow {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+  }
+
+  .login-title {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+
+  .login-title em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 300;
+  }
+
+  .login-sub {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .login-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fffefb;
+    font-family: inherit;
+    font-size: 15px;
+    color: var(--ink);
+    text-align: center;
+    letter-spacing: 0.05em;
+    transition: border-color 0.2s;
+  }
+
+  .login-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .login-btn {
+    width: 100%;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .login-btn:hover { background: #b5633b; }
+  .login-btn:disabled { opacity: 0.55; cursor: default; }
+
+  .login-error {
+    font-size: 13px;
+    color: var(--accent);
+    min-height: 18px;
+    margin-top: 2px;
+  }
+
+  .login-remember {
+    font-size: 12px;
+    color: var(--ink-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  /* === Header === */
+  header {
+    text-align: left;
+    margin-bottom: 36px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .eyebrow {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-weight: 400;
+    font-size: 36px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 300;
+  }
+
+  .subtitle {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-style: italic;
+    font-size: 16px;
+    color: var(--ink-soft);
+    margin-bottom: 28px;
+  }
+
+  /* === Progress Signature === */
+  .progress {
+    margin-top: 24px;
+  }
+
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pip {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1.5px solid var(--line);
+    flex-shrink: 0;
+    transition: all 0.4s ease;
+    position: relative;
+  }
+
+  .pip.done {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--done-glow);
+  }
+
+  .pip.threshold {
+    border-color: var(--gold);
+    border-width: 2px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .pip.threshold::after {
+    content: "✦";
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--gold);
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: 8px;
+  }
+
+  .count {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--ink);
+  }
+
+  .count em {
+    color: var(--accent);
+    font-style: normal;
+  }
+
+  .count .sep {
+    color: var(--ink-faint);
+    margin: 0 4px;
+  }
+
+  .count .total {
+    color: var(--ink-soft);
+    font-size: 16px;
+  }
+
+  .stage {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink-soft);
+    transition: color 0.4s ease;
+  }
+
+  .stage.ready {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .threshold-note {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+  }
+
+  .threshold-note em {
+    color: var(--gold);
+    font-style: normal;
+  }
+
+  /* === Mantra (心錨) === */
+  .mantra {
+    margin-top: 32px;
+    margin-bottom: 4px;
+    padding: 22px 24px 20px;
+    background: linear-gradient(135deg, #fbf3e3 0%, #f7ecd6 100%);
+    border-left: 2px solid var(--gold);
+    border-radius: 2px;
+    position: relative;
+  }
+
+  .mantra-eyebrow {
+    font-family: 'Fraunces', serif;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+
+  .mantra-text {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-style: italic;
+    font-size: 19px;
+    line-height: 1.65;
+    color: var(--ink);
+    font-weight: 400;
+    letter-spacing: 0.005em;
+  }
+
+  .mantra-source {
+    margin-top: 12px;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.08em;
+  }
+
+  @media (max-width: 480px) {
+    .mantra {
+      padding: 18px 20px;
+    }
+    .mantra-text {
+      font-size: 17px;
+    }
+  }
+
+  /* === Section === */
+  section {
+    margin-bottom: 36px;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .section-mark {
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    font-weight: 300;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  h2 {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-weight: 500;
+    font-size: 22px;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+  }
+
+  .section-tag {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-bottom: 18px;
+    margin-left: 44px;
+    letter-spacing: 0.02em;
+  }
+
+  /* === Item === */
+  .item {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+  }
+
+  .item.done {
+    background: #fcf6ee;
+    border-color: var(--accent-soft);
+  }
+
+  .item-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .checkbox-wrap {
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  .checkbox {
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid var(--ink-faint);
+    border-radius: 5px;
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .checkbox:hover {
+    border-color: var(--accent);
+  }
+
+  .item.done .checkbox {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .checkbox-icon {
+    width: 12px;
+    height: 12px;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.2s;
+  }
+
+  .item.done .checkbox-icon {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .checkbox-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: white;
+    stroke-width: 3;
+  }
+
+  .item-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .item-label {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+
+  .item-label .item-id {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  .item.done .item-label {
+    color: var(--ink-soft);
+  }
+
+  .item-hint {
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  .item-note {
+    margin-top: 12px;
+    margin-left: 32px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 64px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fffefb;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink);
+    resize: vertical;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: #fffcf6;
+  }
+
+  textarea::placeholder {
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+
+  /* === Footer === */
+  footer {
+    margin-top: 56px;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+  }
+
+  .footer-head {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-weight: 500;
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: var(--ink);
+  }
+
+  .footer-list {
+    list-style: none;
+    margin-bottom: 28px;
+  }
+
+  .footer-list li {
+    font-size: 14px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+    padding-left: 18px;
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .footer-list li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+  }
+
+  .footer-list strong {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .stop-loss {
+    background: #fcf3eb;
+    border-left: 3px solid var(--accent);
+    padding: 16px 18px;
+    border-radius: 4px;
+    margin-top: 16px;
+  }
+
+  .stop-loss-title {
+    font-family: 'Fraunces', 'Noto Serif TC', serif;
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--accent);
+    margin-bottom: 6px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .stop-loss-body {
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.6;
+  }
+
+  .save-status {
+    text-align: center;
+    margin-top: 32px;
+    font-size: 12px;
+    color: var(--ink-faint);
+    letter-spacing: 0.05em;
+  }
+
+  .save-status.saving { color: var(--moss); }
+  .save-status.error { color: var(--accent); }
+
+  /* === Backup + account === */
+  .backup-bar {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+
+  .backup-btn {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .backup-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #fcf6ee;
+  }
+
+  .backup-note {
+    text-align: center;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-top: 12px;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+
+  .lock-btn {
+    display: block;
+    margin: 16px auto 0;
+    background: none;
+    border: none;
+    color: var(--ink-faint);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .lock-btn:hover { color: var(--accent); }
+
+  /* === Mobile === */
+  @media (max-width: 480px) {
+    .page {
+      padding: 24px 16px 60px;
+    }
+    h1 {
+      font-size: 30px;
+    }
+    .pip {
+      width: 12px;
+      height: 12px;
+    }
+    .section-mark {
+      font-size: 28px;
+    }
+    h2 {
+      font-size: 19px;
+    }
+    .section-tag {
+      margin-left: 0;
+      margin-bottom: 14px;
+    }
+    .item-note {
+      margin-left: 0;
+    }
+  }
+
+  /* === Reduced motion === */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- 通關密語 -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-eyebrow">A PERSONAL THRESHOLD</div>
+    <div class="login-title">離職 <em>Checklist</em></div>
+    <div class="login-sub">這是私人空間，請輸入通關密語。</div>
+    <form class="login-form" id="loginForm">
+      <input class="login-input" id="loginInput" type="password" inputmode="text"
+             autocomplete="current-password" placeholder="通關密語" autofocus>
+      <button class="login-btn" id="loginBtn" type="submit">進入</button>
+      <div class="login-error" id="loginError"></div>
+      <label class="login-remember">
+        <input type="checkbox" id="rememberPass" checked>
+        記住這台裝置（下次免輸入）
+      </label>
+    </form>
+  </div>
+</div>
+
+<div class="page" id="page" style="display:none;">
+
+  <header>
+    <div class="eyebrow">A PERSONAL THRESHOLD</div>
+    <h1>離職 <em>Checklist</em></h1>
+    <p class="subtitle">— 給準備離開的我</p>
+
+    <div class="mantra">
+      <div class="mantra-eyebrow">高我的話 · 心錨</div>
+      <div class="mantra-text">未來就是會比現在更好，<br>所以我根本不需要擔心。</div>
+      <div class="mantra-source">— 2026.06.19 升起的句子，焦慮時請回到這裡</div>
+    </div>
+
+    <div class="progress">
+      <div class="progress-row" id="progressRow"></div>
+      <div class="progress-info">
+        <div class="count">
+          <em id="doneCount">0</em><span class="sep">/</span><span class="total">19</span>
+        </div>
+        <div class="stage" id="stageLabel">尚未開始</div>
+      </div>
+      <div class="threshold-note">
+        <em>✦</em> 標示 = 70%（14 項）門檻 — 達標即可離職
+      </div>
+    </div>
+  </header>
+
+  <main id="main"></main>
+
+  <footer>
+    <div class="footer-head">使用方式</div>
+    <ul class="footer-list">
+      <li><strong>不需要全部勾，70% 就執行。</strong>完美主義是陷阱。</li>
+      <li><strong>每 1-3 個月 review 一次。</strong>不 review 等於自我欺騙。</li>
+      <li><strong>A 類（聚焦與方向）優先處理。</strong>這是最容易卡的地方。</li>
+      <li><strong>內容自動同步到雲端。</strong>電腦、手機輸入同一組密語就看得到同一份。</li>
+    </ul>
+
+    <div class="stop-loss">
+      <div class="stop-loss-title">⚠ 停損條款</div>
+      <div class="stop-loss-body">
+        如果 F2 觸發點觸發（持續情緒崩潰、健康警訊、無法打磨超過 2 個月）——<strong>不管 checklist 完成幾項，立刻離職。</strong>別等準備完美。
+      </div>
+    </div>
+
+    <div class="save-status" id="saveStatus">準備中…</div>
+
+    <div class="backup-bar">
+      <button type="button" class="backup-btn" id="exportBtn">⬇ 匯出備份</button>
+      <button type="button" class="backup-btn" id="importBtn">⬆ 匯入還原</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+    <div class="backup-note">
+      資料同步在雲端。重大變動前建議「匯出備份」存一份 JSON 保命。
+    </div>
+
+    <button type="button" class="lock-btn" id="lockBtn">鎖定 / 切換密語</button>
+  </footer>
+
+</div>
+
+<script>
+  const API = '/api/state';
+  const THRESHOLD_INDEX = 14; // 70% of 19 ≈ 14
+  const PASS_KEY = 'exit-checklist-pass';
+  const CACHE_KEY = 'exit-checklist-cache-v1';
+
+  const SECTIONS = [
+    {
+      id: 'A',
+      title: '聚焦與方向',
+      tag: '對應塔羅：聖杯七（聚焦）、錢幣八逆（沒在磨）',
+      items: [
+        { id: 'A1', label: '已從 6+ 產品線聚焦到 1-2 個主線', hint: '寫下名字 + 為什麼選這個，不是其他' },
+        { id: 'A2', label: '主線有「3 個月內可驗證的假設」', hint: '具體寫下假設與驗證方法' },
+        { id: 'A3', label: '主線有至少一個可運作的原型 / MVP', hint: '即使粗糙也算' },
+        { id: 'A4', label: '能用一句話講清楚「離職後第一個月要做什麼」', hint: '寫在下方備註' }
+      ]
+    },
+    {
+      id: 'B',
+      title: '經濟準備',
+      tag: '基本前提 — 沒這個會慌',
+      items: [
+        { id: 'B1', label: '至少 6 個月生活費已存好', hint: '含房租、生活、健保、社交、意外緩衝' },
+        { id: 'B2', label: '副業/顧問業務有第一個實際收入或書面預約', hint: '不是「我有想法」，是「有人付過錢」或「有人說好要付」' },
+        { id: 'B3', label: '列出「最低財務模式」', hint: '每月最少需要多少進帳才不慌？' }
+      ]
+    },
+    {
+      id: 'C',
+      title: '內在準備',
+      tag: '對應塔羅：錢幣七（評估）、皇帝（自己當結構）',
+      items: [
+        { id: 'C1', label: '寫出「我真實的恐懼是什麼」清單', hint: '不是抽象的「失敗」，是具體的（例如：失去身份、家人質疑、被同行看不起）' },
+        { id: 'C2', label: '處理過宏碁的傷', hint: '不再被「不踏實 / 跟不上進度」這類語言觸發到崩潰' },
+        { id: 'C3', label: '對「我可能會失敗」有可承受的接受', hint: '不是強迫自己不怕，是承認怕但仍能行動' }
+      ]
+    },
+    {
+      id: 'D',
+      title: '外在資源',
+      tag: '對應塔羅：女祭司（深度連結）、聖杯侍者（種子）',
+      items: [
+        { id: 'D1', label: '有 1-2 個「同樣在做這種事」的 peer 或社群', hint: '不要孤軍。一個人走會卡更久' },
+        { id: 'D2', label: '列出至少 3 個潛在客戶或合作對象', hint: '即使還沒談，先列出來' },
+        { id: 'D3', label: 'Skills、Obsidian、Cowork、Claude Code 系統可運作', hint: '離職後不需要重建工具' }
+      ]
+    },
+    {
+      id: 'E',
+      title: '能量與健康',
+      tag: '中間方案測試 — 驗證「邊上班邊準備」可不可行',
+      items: [
+        { id: 'E1', label: '過去 3 個月，每週至少 5-10 小時真正打磨', hint: '不是塞時間、不是疲憊滑手機、是有效投入' },
+        { id: 'E2', label: '主業已調整到「能達標但不過勞」', hint: '不是過度認真，也不是內耗式擺爛' },
+        { id: 'E3', label: '身體沒有需要立刻處理的健康警訊', hint: '失眠、暴瘦、發炎、情緒長期低落' }
+      ]
+    },
+    {
+      id: 'F',
+      title: '退場機制',
+      tag: '對應塔羅：權杖國王逆位（避免衝動）— 但也避免拖到崩潰',
+      items: [
+        { id: 'F1', label: '設定明確的離職 timeline', hint: '最晚什麼時候必須離開？6 個月？1 年？不能無限拖' },
+        { id: 'F2', label: '設定「立刻停損」觸發點', hint: '什麼狀況下不管 checklist 多少都要立刻離職？' },
+        { id: 'F3', label: 'Plan B', hint: '如果離職後 6 個月不順，怎麼辦？不是失敗計畫，是安全網' }
+      ]
+    }
+  ];
+
+  let state = { items: {} };
+  let passphrase = '';
+  let saveTimeout = null;
+
+  // Initialize default state structure
+  function resetState() {
+    state = { items: {} };
+    SECTIONS.forEach(section => {
+      section.items.forEach(item => {
+        state.items[item.id] = { checked: false, note: '' };
+      });
+    });
+  }
+  resetState();
+
+  // Merge a saved snapshot into the default structure (ignores unknown ids)
+  function mergeInto(saved) {
+    if (!saved || !saved.items) return;
+    Object.keys(saved.items).forEach(id => {
+      if (state.items[id]) state.items[id] = saved.items[id];
+    });
+  }
+
+  function setStatus(text, cls) {
+    const el = document.getElementById('saveStatus');
+    el.textContent = text;
+    el.classList.remove('saving', 'error');
+    if (cls) el.classList.add(cls);
+  }
+
+  function timeLabel() {
+    return new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function cacheLocal() {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function loadCache() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  // === API (cloud sync) ===
+  async function apiGet() {
+    const resp = await fetch(API, { headers: { 'x-passphrase': passphrase } });
+    if (resp.status === 401) { const e = new Error('unauthorized'); e.code = 401; throw e; }
+    if (!resp.ok) { const e = new Error('server'); e.code = resp.status; throw e; }
+    const data = await resp.json();
+    return data.state;
+  }
+
+  async function apiSave() {
+    const resp = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-passphrase': passphrase },
+      body: JSON.stringify({ state })
+    });
+    if (resp.status === 401) { const e = new Error('unauthorized'); e.code = 401; throw e; }
+    if (!resp.ok) { const e = new Error('server'); e.code = resp.status; throw e; }
+  }
+
+  // === Boot / auth ===
+  function showLogin(msg) {
+    document.getElementById('page').style.display = 'none';
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('loginError').textContent = msg || '';
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = false;
+    btn.textContent = '進入';
+    const input = document.getElementById('loginInput');
+    input.value = '';
+    input.focus();
+  }
+
+  function showApp() {
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('page').style.display = 'block';
+  }
+
+  async function enter(pass, remember) {
+    passphrase = pass;
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = true;
+    btn.textContent = '驗證中…';
+    try {
+      const remote = await apiGet();
+      // success
+      if (remember) {
+        try { localStorage.setItem(PASS_KEY, passphrase); } catch (e) {}
+      } else {
+        try { localStorage.removeItem(PASS_KEY); } catch (e) {}
+      }
+      resetState();
+      mergeInto(remote);
+      cacheLocal();
+      showApp();
+      render();
+      setStatus('已同步 ' + timeLabel());
+    } catch (err) {
+      if (err.code === 401) {
+        passphrase = '';
+        showLogin('密語錯誤，請再試一次。');
+      } else {
+        // server/network problem but passphrase may be right — let them in with cache
+        if (remember) { try { localStorage.setItem(PASS_KEY, passphrase); } catch (e) {} }
+        resetState();
+        mergeInto(loadCache());
+        showApp();
+        render();
+        setStatus('離線：顯示本機快取，連線後會自動同步', 'error');
+      }
+    }
+  }
+
+  async function boot() {
+    const saved = (() => { try { return localStorage.getItem(PASS_KEY); } catch (e) { return null; } })();
+    if (saved) {
+      document.getElementById('rememberPass').checked = true;
+      await enter(saved, true);
+    } else {
+      showLogin('');
+    }
+  }
+
+  function lock() {
+    try { localStorage.removeItem(PASS_KEY); } catch (e) {}
+    passphrase = '';
+    showLogin('');
+  }
+
+  // === Backup: export / import ===
+  function exportBackup() {
+    const payload = JSON.stringify(state, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `exit-checklist-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importBackup(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const saved = JSON.parse(reader.result);
+        if (!saved || !saved.items) throw new Error('格式不符');
+        mergeInto(saved);
+        render();
+        saveState();
+        alert('已從備份還原並同步。');
+      } catch (e) {
+        alert('檔案無法讀取或格式錯誤，未做任何變更。');
+        console.error(e);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function getDoneCount() {
+    return Object.values(state.items).filter(i => i.checked).length;
+  }
+
+  function getStage(count) {
+    if (count === 0) return { text: '尚未開始', ready: false };
+    if (count < 6) return { text: '種子階段', ready: false };
+    if (count < 10) return { text: '初芽', ready: false };
+    if (count < 14) return { text: '成長中', ready: false };
+    if (count < 19) return { text: '準備飛了 ✦', ready: true };
+    return { text: '全數完成 — 飛吧', ready: true };
+  }
+
+  function renderProgress() {
+    const row = document.getElementById('progressRow');
+    row.innerHTML = '';
+    const doneCount = getDoneCount();
+
+    let renderedCount = 0;
+    SECTIONS.forEach(section => {
+      section.items.forEach(item => {
+        const pip = document.createElement('div');
+        pip.className = 'pip';
+        if (state.items[item.id].checked) {
+          pip.classList.add('done');
+        }
+        renderedCount++;
+        if (renderedCount === THRESHOLD_INDEX) {
+          pip.classList.add('threshold');
+        }
+        row.appendChild(pip);
+      });
+    });
+
+    document.getElementById('doneCount').textContent = doneCount;
+    const stage = getStage(doneCount);
+    const stageEl = document.getElementById('stageLabel');
+    stageEl.textContent = stage.text;
+    if (stage.ready) {
+      stageEl.classList.add('ready');
+    } else {
+      stageEl.classList.remove('ready');
+    }
+  }
+
+  function render() {
+    const main = document.getElementById('main');
+    main.innerHTML = '';
+
+    SECTIONS.forEach(section => {
+      const sec = document.createElement('section');
+      sec.innerHTML = `
+        <div class="section-head">
+          <div class="section-mark">${section.id}</div>
+          <h2>${section.title}</h2>
+        </div>
+        <div class="section-tag">${section.tag}</div>
+      `;
+
+      section.items.forEach(item => {
+        const data = state.items[item.id];
+        const div = document.createElement('div');
+        div.className = 'item' + (data.checked ? ' done' : '');
+        div.dataset.id = item.id;
+
+        div.innerHTML = `
+          <div class="item-head" data-toggle="${item.id}">
+            <div class="checkbox-wrap">
+              <div class="checkbox">
+                <div class="checkbox-icon">
+                  <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+              </div>
+            </div>
+            <div class="item-content">
+              <div class="item-label"><span class="item-id">${item.id}</span>${item.label}</div>
+              <div class="item-hint">${item.hint}</div>
+            </div>
+          </div>
+          <div class="item-note">
+            <textarea data-note="${item.id}" placeholder="寫下你的想法、進度、卡住的地方…">${escapeHtml(data.note || '')}</textarea>
+          </div>
+        `;
+
+        sec.appendChild(div);
+      });
+
+      main.appendChild(sec);
+    });
+
+    renderProgress();
+    bindEvents();
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  // Save to cloud (debounced), with local cache as a safety net
+  async function saveState() {
+    cacheLocal();
+    setStatus('儲存中…', 'saving');
+    try {
+      await apiSave();
+      setStatus('已同步 ' + timeLabel());
+    } catch (err) {
+      if (err.code === 401) {
+        setStatus('密語失效，請重新鎖定登入', 'error');
+      } else {
+        setStatus('儲存失敗（已存本機，稍後重試）', 'error');
+      }
+    }
+  }
+
+  function debouncedSave() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(saveState, 600);
+  }
+
+  function bindEvents() {
+    document.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.tagName === 'TEXTAREA') return;
+        const id = el.dataset.toggle;
+        state.items[id].checked = !state.items[id].checked;
+        const itemEl = el.closest('.item');
+        itemEl.classList.toggle('done', state.items[id].checked);
+        renderProgress();
+        debouncedSave();
+      });
+    });
+
+    document.querySelectorAll('[data-note]').forEach(el => {
+      el.addEventListener('input', () => {
+        const id = el.dataset.note;
+        state.items[id].note = el.value;
+        debouncedSave();
+      });
+      el.addEventListener('click', (e) => e.stopPropagation());
+    });
+  }
+
+  // === Static control bindings (bound once) ===
+  document.getElementById('loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const pass = document.getElementById('loginInput').value.trim();
+    if (!pass) return;
+    const remember = document.getElementById('rememberPass').checked;
+    enter(pass, remember);
+  });
+
+  document.getElementById('lockBtn').addEventListener('click', lock);
+  document.getElementById('exportBtn').addEventListener('click', exportBackup);
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) importBackup(file);
+    e.target.value = '';
+  });
+
+  // Boot
+  boot();
+</script>
+
+</body>
+</html>
